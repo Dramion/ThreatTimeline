@@ -30,7 +30,7 @@ A visualization tool for mapping and analyzing attack lifecycles using MITRE ATT
 
 ```bash
 # Clone the repository
-git clone https://github.com/[your-username]/ThreatTimeline.git
+git clone https://github.com/K1zzmit/ThreatTimeline.git
 
 # Navigate to project directory
 cd ThreatTimeline
