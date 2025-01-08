@@ -9,8 +9,10 @@ import { EventForm } from './EventForm';
 import { DialogHeader } from './DialogHeader';
 import bash from 'react-syntax-highlighter/dist/esm/languages/hljs/bash';
 
-// Register the languages
+// Register languages
 SyntaxHighlighter.registerLanguage('sql', sql);
+// Register 'splunk' as a language with bash highlighting rules
+// This works well for SPL since it shares many similarities with bash/shell syntax
 SyntaxHighlighter.registerLanguage('splunk', bash);
 
 interface ReadOnlyViewProps {

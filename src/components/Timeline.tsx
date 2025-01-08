@@ -6,6 +6,8 @@ import { TimelineList } from './timeline/TimelineList';
 import { EventDialog } from './timeline/EventDialog';
 import type { TimelineEvent } from '@/pages/Index';
 import { ActionButtons } from './ActionButtons';
+import { Button } from './ui/button';
+import { Plus } from 'lucide-react';
 
 interface TimelineProps {
   events: TimelineEvent[];
@@ -86,7 +88,15 @@ const Timeline = forwardRef<TimelineRef, TimelineProps>(({
     <TimelineProvider>
       <Card className="flex flex-col h-full">
         <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Timeline</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-bold">Timeline</h2>
+            {isEditMode && (
+              <Button onClick={() => handleAddEvent()} size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Event
+              </Button>
+            )}
+          </div>
           <ActionButtons
             page="timeline"
             onLoadDemo={onLoadDemo}
