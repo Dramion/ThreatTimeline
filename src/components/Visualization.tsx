@@ -20,6 +20,8 @@ import ReactFlow, {
   getRectOfNodes,
   getTransformForBounds,
   useReactFlow,
+  getNodesBounds,
+  getViewportForBounds,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import type { TimelineEvent } from '@/pages/Index';
@@ -41,23 +43,14 @@ const CustomEdge = ({
   sourceY,
   targetX,
   targetY,
-  sourcePosition = Position.Right,
-  targetPosition = Position.Left,
+  sourcePosition = Position.Bottom,
+  targetPosition = Position.Top,
   style,
   markerEnd,
   data
 }: EdgeProps) => {
-  if (data?.path) {
-    return (
-      <path
-        d={data.path}
-        fill="none"
-        style={style}
-        markerEnd={markerEnd}
-      />
-    );
-  }
-
+  const isLateralMovement = data?.isLateralMovement;
+  
   const [edgePath] = getSmoothStepPath({
     sourceX,
     sourceY,
@@ -71,7 +64,12 @@ const CustomEdge = ({
     <path
       d={edgePath}
       fill="none"
-      style={style}
+      style={{
+        ...style,
+        strokeDasharray: isLateralMovement ? '5,5' : 'none',
+        stroke: isLateralMovement ? '#ef4444' : style?.stroke,
+        strokeWidth: isLateralMovement ? 3 : 2,
+      }}
       markerEnd={markerEnd}
     />
   );
@@ -132,7 +130,10 @@ const Flow: React.FC<VisualizationProps> = ({
 
   // Define node and edge types
   const nodeTypes = React.useMemo(() => ({ default: EventNode }), []);
-  const edgeTypes = React.useMemo(() => ({ smoothstep: CustomEdge }), []);
+  const edgeTypes = React.useMemo(() => ({ 
+    default: CustomEdge,
+    smoothstep: CustomEdge 
+  }), []);
 
   const handleNodeDragStop: NodeDragHandler = (event, node) => {
     if (onPositionsChange) {
@@ -155,7 +156,7 @@ const Flow: React.FC<VisualizationProps> = ({
     const dataUrl = await toPng(reactFlowWrapper.current, {
       backgroundColor: '#ffffff',
       width: 1000,
-      height: 800,
+      height: 1000,
       style: {
         width: '1000px',
         height: '800px',
@@ -177,6 +178,7 @@ const Flow: React.FC<VisualizationProps> = ({
       return;
     }
     const newState = calculateLayout(events);
+    console.log('New state from calculateLayout:', newState);
     
     if (savedPositions) {
       newState.nodes = newState.nodes.map(node => ({
@@ -205,6 +207,18 @@ const Flow: React.FC<VisualizationProps> = ({
 
   return (
     <div className="w-full h-full" ref={reactFlowWrapper}>
+      <style>
+        {`
+          @keyframes dashdraw {
+            from {
+              stroke-dashoffset: 10;
+            }
+            to {
+              stroke-dashoffset: 0;
+            }
+          }
+        `}
+      </style>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -213,6 +227,9 @@ const Flow: React.FC<VisualizationProps> = ({
         onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        defaultEdgeOptions={{
+          type: 'default'
+        }}
         fitView
       >
         <Panel position="top-right" className="bg-background/95 p-2 rounded-lg shadow-lg">

@@ -10,7 +10,7 @@ import { EventDetails } from './event-dialog/EventDetails';
 import { DialogHeader } from './event-dialog/DialogHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Editor from '@monaco-editor/react';
-import { Copy } from 'lucide-react';
+import { Copy, RotateCcw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 // Configure Monaco Editor for Splunk SPL syntax
@@ -75,6 +75,7 @@ export const EventDialog: React.FC<EventDialogProps> = ({
   const [newArtifactLinkedValue, setNewArtifactLinkedValue] = useState('');
   const [currentEvent, setCurrentEvent] = useState<TimelineEvent | null>(null);
   const [activeTab, setActiveTab] = useState('details');
+  const [showSuggestions, setShowSuggestions] = useState(true);
 
   // Reset currentEvent whenever event prop changes
   useEffect(() => {
@@ -86,21 +87,24 @@ export const EventDialog: React.FC<EventDialogProps> = ({
 
   if (!event || !currentEvent) return null;
 
-  const recentArtifacts = events.reduce((acc, evt) => {
+  const recentArtifacts = showSuggestions ? events.reduce((acc, evt) => {
     evt.artifacts?.forEach(artifact => {
       if (!acc[artifact.type]) {
         acc[artifact.type] = [];
       }
-      const existingArtifact = acc[artifact.type].find(a => a.value === artifact.value);
+      const existingArtifact = acc[artifact.type].find(a => 
+        a.value === artifact.value && a.name === artifact.name
+      );
       if (!existingArtifact) {
         acc[artifact.type].push({
+          name: artifact.name,
           value: artifact.value,
           linkedValue: artifact.linkedValue,
         });
       }
     });
     return acc;
-  }, {} as { [key: string]: { value: string; linkedValue?: string }[] });
+  }, {} as { [key: string]: { name: string; value: string; linkedValue?: string }[] }) : {};
 
   const handleAddArtifact = () => {
     if (!newArtifactName || !newArtifactValue) return;
@@ -147,6 +151,15 @@ export const EventDialog: React.FC<EventDialogProps> = ({
   const handleSave = () => {
     if (!currentEvent) return;
     onSave(currentEvent);
+  };
+
+  const handleResetRecentArtifacts = () => {
+    setShowSuggestions(false);
+    
+    toast({
+      title: "Recent artifacts cleared",
+      description: "All saved artifact suggestions have been reset.",
+    });
   };
 
   return (
@@ -208,6 +221,7 @@ export const EventDialog: React.FC<EventDialogProps> = ({
               readOnly={!isEditMode}
               isEditMode={isEditMode}
               handleSubmit={handleSave}
+              onResetSuggestions={() => setShowSuggestions(false)}
             />
           </TabsContent>
           <TabsContent value="search" className="space-y-4">

@@ -166,7 +166,7 @@ export const EventItem: React.FC<EventItemProps> = ({
               </Button>
             )}
             <span className="text-sm text-muted-foreground">
-              {formatTimestamp(event.timestamp)}
+              {formatTimestamp(event.timestamp, event.timezone)}
             </span>
             <span className={cn(
               "font-medium truncate",

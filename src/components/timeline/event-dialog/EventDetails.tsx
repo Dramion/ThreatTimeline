@@ -9,15 +9,34 @@ import { Button } from '@/components/ui/button';
 loader.init().then(monaco => {
   monaco.languages.register({ id: 'splunk' });
   monaco.languages.setMonarchTokensProvider('splunk', {
+    defaultToken: '',
+    ignoreCase: true,
     tokenizer: {
       root: [
-        [/\|/, 'pipe'],
-        [/\b(search|where|eval|stats|rename|rex|table|dedup|sort|top|rare|timechart|transaction|join|lookup)\b/, 'command'],
-        [/\b(sourcetype|source|index|host)\s*=/, 'argument'],
-        [/"[^"]*"|'[^']*'/, 'string'],
-        [/\b[a-zA-Z0-9_]+\s*=/, 'field'],
-        [/=|!=|<|>|<=|>=|AND|OR|NOT/, 'keyword'],
-        [/\b\d+\b/, 'number'],
+        // Basic commands - blue
+        [/\b(search|stats|where|eval|rename|table|dedup|sort|fields)\b/, 'command'],
+        
+        // Functions - purple
+        [/\b(count|values|sum|avg|min|max|list|dc|earliest|latest)\b/, 'function'],
+        
+        // Keywords - orange
+        [/\b(by|as|in|not|and|or|where)\b/, 'keyword'],
+        
+        // Fields - light blue
+        [/\b[a-zA-Z0-9_]+(?=\s*[=]|$|\s+(?:as|by|in)|\s*\(|\s*,)/, 'field'],
+        
+        // Strings - orange
+        [/"[^"]*"/, 'string'],
+        [/'[^']*'/, 'string'],
+        
+        // Operators - red
+        [/[=<>!]=?|[\+\-\*\/\%]|\b(?:AND|OR|NOT)\b/, 'operator'],
+        
+        // Delimiters - white
+        [/[\(\),]/, 'delimiter'],
+        
+        // Pipes - white
+        [/\|/, 'pipe']
       ]
     }
   });
@@ -26,14 +45,14 @@ loader.init().then(monaco => {
     base: 'vs-dark',
     inherit: true,
     rules: [
-      { token: 'function', foreground: 'c586c0' },  // pink
-      { token: 'command', foreground: '569cd6', fontStyle: 'bold' },  // blue bold
-      { token: 'pipe', foreground: 'd4d4d4', fontStyle: 'bold' },  // white bold
-      { token: 'argument', foreground: '3dc9b0' },  // teal
-      { token: 'keyword', foreground: 'dd6a6f' },  // red for AND|OR|WHERE etc
-      { token: 'string', foreground: 'ce9178' },  // orange
-      { token: 'number', foreground: 'b5cea8' },  // green
-      { token: 'field', foreground: '9cdcfe' },  // light blue
+      { token: 'command', foreground: '6B98FF', fontStyle: 'bold' },     // Bright blue
+      { token: 'function', foreground: 'C586C0', fontStyle: 'bold' },    // Purple
+      { token: 'keyword', foreground: 'CE9178', fontStyle: 'bold' },     // Orange
+      { token: 'field', foreground: '4FC1FF' },                          // Light blue
+      { token: 'string', foreground: 'CE9178' },                         // Orange
+      { token: 'operator', foreground: 'FF6B6B' },                       // Red
+      { token: 'delimiter', foreground: 'D4D4D4' },                      // White
+      { token: 'pipe', foreground: 'D4D4D4', fontStyle: 'bold' }        // White bold
     ],
     colors: {
       'editor.background': '#0a0d17',

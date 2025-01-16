@@ -51,11 +51,28 @@ export const calculateLayout = (events: TimelineEvent[]): { nodes: Node[], edges
 
   // For Initial Access events from lateral movement, set their level and calculate their children's levels
   lateralMovementEvents.forEach(lateralEvent => {
-    if (lateralEvent.lateralMovementTarget) {
-      const targetEvent = events.find(e => e.id === lateralEvent.lateralMovementTarget);
+    if (lateralEvent.tactic === 'Lateral Movement') {
+      // Find the Initial Access event based on the destination hostname in artifacts
+      const destinationHost = lateralEvent.artifacts?.find(a => 
+        a.type === 'hostname' && 
+        a.name === 'Destination Host'
+      )?.value;
+
+      const targetEvent = events.find(e => 
+        e.tactic === 'Initial Access' && 
+        e.host === destinationHost
+      );
+      
       if (targetEvent) {
+        // Set the level of the Initial Access event to be one level below the lateral movement event
         const sourceLevel = nodeLevels.get(lateralEvent.id) || 0;
-        calculateLevels(targetEvent.id, sourceLevel, true);
+        nodeLevels.set(targetEvent.id, sourceLevel + 1);
+        
+        // Calculate levels for any children of the Initial Access event
+        const children = events.filter(e => e.parentId === targetEvent.id);
+        children.forEach(child => {
+          calculateLevels(child.id, sourceLevel + 2);
+        });
       }
     }
   });
@@ -218,16 +235,16 @@ export const calculateLayout = (events: TimelineEvent[]): { nodes: Node[], edges
     const yOffset = (event.tactic === 'Initial Access' && isLateralMovementTarget) ? initialAccessOffset : 0;
     
     return {
-      id: event.id,
-      type: 'default',
-      data: event,
-      position: { 
+    id: event.id,
+    type: 'default',
+    data: event,
+    position: {
         x: nodePositions.get(event.id)!.x,
         y: level * verticalSpacing + topMargin + yOffset
-      },
-      draggable: true,
-      connectable: false,
-      selectable: true,
+    },
+    draggable: true,
+    connectable: false,
+    selectable: true,
       style: {
         width: nodeWidth,
         background: 'hsl(var(--background))',
@@ -335,36 +352,61 @@ export const calculateLayout = (events: TimelineEvent[]): { nodes: Node[], edges
 
   // Add lateral movement connections with dashed red lines
   events.forEach(event => {
-    if (event.lateralMovementTarget) {
-      const sourceNode = nodes.find(n => n.id === event.id);
-      const targetNode = nodes.find(n => n.id === event.lateralMovementTarget);
+    if (event.tactic === 'Lateral Movement') {
+      // Find the Initial Access event based on the destination hostname in artifacts
+      const destinationHost = event.artifacts?.find(a => 
+        a.type === 'hostname' && 
+        a.name === 'Destination Host'
+      )?.value;
+
+      const targetEvent = events.find(e => 
+        e.tactic === 'Initial Access' && 
+        e.host === destinationHost
+      );
       
-      if (sourceNode && targetNode) {
+      if (targetEvent) {
         edges.push({
-          id: `lateral-${event.id}-${event.lateralMovementTarget}`,
+          id: `lateral-${event.id}-${targetEvent.id}`,
           source: event.id,
-          target: event.lateralMovementTarget,
+          target: targetEvent.id,
           animated: true,
           type: 'straight',
           style: { 
             stroke: '#ef4444',
             strokeWidth: 3,
             strokeDasharray: '5,5',
+            zIndex: 1000,
           },
+          data: {
+            isLateralMovement: true
+          }
         });
       }
     }
   });
 
   return { nodes, edges };
-};// Ensure DefaultNode is defined or imported
+};
+
+// Ensure DefaultNode is defined or imported
 const DefaultNode: React.FC<NodeProps> = ({ data }) => {
+  const isLateralMovement = data.tactic === 'Lateral Movement';
+  const isInitialAccess = data.tactic === 'Initial Access';
+  
   return (
     <div className="p-4 bg-background border rounded-lg shadow-sm">
-      <div className="font-medium">{data.tactic}</div>
+      <div className="font-medium">
+        {isInitialAccess && <span className="text-blue-400">♦ </span>}
+        {data.title || data.tactic}
+          </div>
       <div className="text-sm text-muted-foreground mt-1">
         {new Date(data.timestamp).toLocaleString()}
-      </div>
+        </div>
+        {data.technique && (
+        <div className="text-sm text-muted-foreground">
+            {data.technique}
+          </div>
+        )}
     </div>
   );
 };

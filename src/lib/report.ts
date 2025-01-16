@@ -1,170 +1,87 @@
 import type { TimelineEvent, Artifact } from '@/pages/Index';
+import type { Incident } from '@/lib/incidents';
 
-interface ArtifactGroup {
-  type: string;
-  items: {
-    value: string;
-    linkedValue?: string;
-    name: string;
-    names: string[];
-    events: {
-      id: string;
-      title: string;
-      timestamp: string;
-    }[];
-  }[];
-}
+export const generateReport = (events: TimelineEvent[], incident: Incident): string => {
+  const timestamp = new Date().toLocaleString();
+  
+  // Start with incident details
+  let report = `# Incident Response Report
+Generated: ${timestamp}
 
-function formatTimestamp(timestamp: string): string {
-  return new Date(timestamp).toLocaleString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    timeZoneName: 'short'
-  });
-}
+## Incident Details
+- Name: ${incident.name}
+- Created: ${new Date(incident.createdAt).toLocaleString()}
+- Last Updated: ${new Date(incident.updatedAt).toLocaleString()}
+${incident.description ? `\nDescription:\n${incident.description}\n` : ''}
 
-function groupArtifacts(events: TimelineEvent[]): ArtifactGroup[] {
-  const groups: { [key: string]: ArtifactGroup } = {};
+## Timeline of Events\n\n`;
 
-  events.forEach(event => {
-    event.artifacts?.forEach(artifact => {
-      if (!groups[artifact.type]) {
-        groups[artifact.type] = {
-          type: artifact.type,
-          items: []
-        };
-      }
-
-      let existingItem = groups[artifact.type].items.find(
-        item => item.value === artifact.value
-      );
-
-      if (!existingItem) {
-        existingItem = {
-          value: artifact.value,
-          linkedValue: artifact.linkedValue,
-          name: artifact.name,
-          names: [artifact.name],
-          events: []
-        };
-        groups[artifact.type].items.push(existingItem);
-      } else {
-        if (!existingItem.names.includes(artifact.name)) {
-          existingItem.names.push(artifact.name);
-        }
-      }
-
-      if (!existingItem.events.some(e => e.id === event.id)) {
-        existingItem.events.push({
-          id: event.id,
-          title: event.title,
-          timestamp: event.timestamp
-        });
-      }
-    });
-  });
-
-  return Object.values(groups);
-}
-
-function generateTimelineSection(events: TimelineEvent[]): string {
   // Sort events by timestamp
   const sortedEvents = [...events].sort((a, b) => 
     new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
 
-  let markdown = '## Timeline of Events\n\n';
+  // Calculate level for each event
+  const getEventLevel = (event: TimelineEvent): number => {
+    let level = 0;
+    let currentEvent = event;
+    while (currentEvent.parentId) {
+      level++;
+      currentEvent = events.find(e => e.id === currentEvent.parentId) || currentEvent;
+      if (level > 5) break; // Prevent infinite loops
+    }
+    return level;
+  };
 
-  sortedEvents.forEach(event => {
-    markdown += `### ${formatTimestamp(event.timestamp)} - ${event.title}\n\n`;
+  // Add each event to the report with appropriate heading level
+  sortedEvents.forEach((event, index) => {
+    const level = getEventLevel(event);
+    // Start at ### (h3) for root events and increase for each level
+    const headingLevel = '#'.repeat(3 + level);
     
-    if (event.description) {
-      markdown += `${event.description}\n\n`;
+    report += `${headingLevel} ${index + 1}. ${event.title}\n`;
+    report += `- Timestamp: ${new Date(event.timestamp).toLocaleString()} ${event.timezone ? `(${event.timezone})` : ''}\n`;
+    if (event.tactic) report += `- Tactic: ${event.tactic}\n`;
+    if (event.technique) report += `- Technique: ${event.technique}\n`;
+    if (event.description) report += `- Description: ${event.description}\n`;
+    
+    // Add artifacts if present
+    if (event.artifacts && event.artifacts.length > 0) {
+      report += '\nArtifacts:\n';
+      event.artifacts.forEach(artifact => {
+        report += `- ${artifact.name} (${artifact.type}): ${artifact.value}\n`;
+      });
     }
-
-    if (event.tactic || event.technique) {
-      markdown += '**MITRE ATT&CK:**\n';
-      if (event.tactic) markdown += `- Tactic: ${event.tactic}\n`;
-      if (event.technique) markdown += `- Technique: ${event.technique}\n`;
-      markdown += '\n';
-    }
-
-    if (event.host || event.user || event.process) {
-      markdown += '**Context:**\n';
-      if (event.host) markdown += `- Host: ${event.host}\n`;
-      if (event.user) markdown += `- User: ${event.user}\n`;
-      if (event.process) markdown += `- Process: ${event.process}\n`;
-      markdown += '\n';
-    }
-
-    if (event.searchQuery) {
-      markdown += '**Search Query:**\n```\n' + event.searchQuery + '\n```\n\n';
-    }
-
-    if (event.rawLog) {
-      markdown += '**Raw Log:**\n```\n' + event.rawLog + '\n```\n\n';
-    }
-
-    markdown += '---\n\n';
+    
+    report += '\n';
   });
 
-  return markdown;
-}
+  // Add Artifacts & IOCs Summary section
+  report += `## Artifacts & IOCs Summary\n\n`;
 
-function generateArtifactsSection(artifactGroups: ArtifactGroup[]): string {
-  let markdown = '## Artifacts & Indicators of Compromise\n\n';
-
-  artifactGroups.forEach(group => {
-    markdown += `### ${group.type.charAt(0).toUpperCase() + group.type.slice(1)} Artifacts\n\n`;
-    
-    group.items.forEach(item => {
-      markdown += `#### ${item.value}\n`;
-      markdown += `- Observed as: ${item.names.join(', ')}\n`;
-      if (item.linkedValue) {
-        markdown += `- Related: \`${item.linkedValue}\`\n`;
+  // Collect all unique artifacts grouped by type
+  const artifactsByType = new Map<string, Set<string>>();
+  events.forEach(event => {
+    event.artifacts.forEach(artifact => {
+      if (!artifactsByType.has(artifact.type)) {
+        artifactsByType.set(artifact.type, new Set());
       }
-      markdown += `- Observed in ${item.events.length} event${item.events.length === 1 ? '' : 's'}:\n`;
-      item.events.forEach(event => {
-        markdown += `  - ${formatTimestamp(event.timestamp)} - ${event.title}\n`;
-      });
-      markdown += '\n';
+      artifactsByType.get(artifact.type)?.add(artifact.value);
+      // Add linked values if they exist
+      if (artifact.linkedValue) {
+        artifactsByType.get(artifact.type)?.add(artifact.linkedValue);
+      }
     });
   });
 
-  return markdown;
-}
-
-export function generateReport(events: TimelineEvent[]): string {
-  const timestamp = new Date().toLocaleString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    timeZoneName: 'short'
+  // Add each artifact type and its unique values
+  Array.from(artifactsByType.entries()).sort().forEach(([type, values]) => {
+    report += `### ${type.charAt(0).toUpperCase() + type.slice(1)}s\n`;
+    Array.from(values).sort().forEach(value => {
+      report += `- ${value}\n`;
+    });
+    report += '\n';
   });
 
-  let markdown = `# Incident Response Report\n\n`;
-  markdown += `Generated on: ${timestamp}\n\n`;
-  
-  // Add executive summary
-  markdown += '## Executive Summary\n\n';
-  markdown += `This report documents a security incident containing ${events.length} events `;
-  markdown += `spanning from ${formatTimestamp(events[0].timestamp)} to ${formatTimestamp(events[events.length - 1].timestamp)}.\n\n`;
-  
-  // Add timeline section
-  markdown += generateTimelineSection(events);
-  
-  // Add artifacts section
-  const artifactGroups = groupArtifacts(events);
-  markdown += generateArtifactsSection(artifactGroups);
-  
-  return markdown;
-} 
+  return report;
+}; 

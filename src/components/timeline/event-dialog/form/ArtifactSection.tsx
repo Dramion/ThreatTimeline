@@ -6,7 +6,13 @@ import { Pencil } from 'lucide-react';
 
 interface ArtifactSectionProps {
   artifacts?: Artifact[];
-  recentArtifacts: { [key: string]: { value: string; linkedValue?: string }[] };
+  recentArtifacts: { 
+    [key: string]: { 
+      name: string;
+      value: string; 
+      linkedValue?: string 
+    }[] 
+  };
   newArtifactType: Artifact['type'];
   newArtifactName: string;
   newArtifactValue: string;
@@ -19,6 +25,7 @@ interface ArtifactSectionProps {
   handleRemoveArtifact: (index: number) => void;
   readOnly?: boolean;
   onArtifactsChange: (artifacts: Artifact[]) => void;
+  onResetSuggestions: () => void;
 }
 
 export const ArtifactSection: React.FC<ArtifactSectionProps> = ({
@@ -36,6 +43,7 @@ export const ArtifactSection: React.FC<ArtifactSectionProps> = ({
   handleRemoveArtifact,
   readOnly = false,
   onArtifactsChange,
+  onResetSuggestions,
 }) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
@@ -81,6 +89,23 @@ export const ArtifactSection: React.FC<ArtifactSectionProps> = ({
       [field]: value
     };
     onArtifactsChange(updatedArtifacts);
+  };
+
+  const handleBulkAdd = (entries: string[]) => {
+    if (!artifacts) return;
+
+    const newArtifacts = entries.map(entry => ({
+      type: newArtifactType,
+      name: newArtifactName,
+      value: entry.trim(),
+      linkedValue: newArtifactLinkedValue || undefined,
+    }));
+
+    onArtifactsChange([...artifacts, ...newArtifacts]);
+
+    // Reset form
+    setNewArtifactValue('');
+    setNewArtifactLinkedValue('');
   };
 
   return (
@@ -130,6 +155,8 @@ export const ArtifactSection: React.FC<ArtifactSectionProps> = ({
           onLinkedValueChange={setNewArtifactLinkedValue}
           onAdd={editingIndex !== null ? handleUpdate : handleAddArtifact}
           recentArtifacts={recentArtifacts}
+          onBulkAdd={handleBulkAdd}
+          onResetSuggestions={onResetSuggestions}
         />
       )}
     </div>

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { useEvents } from '@/lib/events';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Search } from 'lucide-react';
-import type { Artifact } from './Index';
+import type { Artifact, TimelineEvent } from './Index';
 import { useToast } from '@/components/ui/use-toast';
 import type { TimelineRef } from '@/components/Timeline';
 import { ActionButtons } from '@/components/ActionButtons';
@@ -17,6 +16,15 @@ interface ArtifactGroup {
     value: string;
     linkedValue?: string;
     names: string[];
+    commands?: string[];
+    customArtifacts?: {
+      value: string;
+      linkedValue?: string;
+      eventTitle?: string;
+      timestamp?: string;
+      eventId?: string;
+      name?: string;
+    }[];
     events: {
       id: string;
       title: string;
@@ -28,16 +36,27 @@ interface ArtifactGroup {
 interface ArtifactsPageProps {
   timelineRef: React.RefObject<TimelineRef>;
   onTabChange: (value: string) => void;
+  events: TimelineEvent[];
 }
 
-const ArtifactsPage: React.FC<ArtifactsPageProps> = ({ timelineRef, onTabChange }) => {
-  const { events } = useEvents();
+interface GroupedArtifacts {
+  hostnames: Artifact[];
+  domains: Artifact[];
+  files: Artifact[];
+  ips: Artifact[];
+  hashes: Artifact[];
+  users: Artifact[];
+  commands: Artifact[];
+  custom: Artifact[];
+}
+
+const ArtifactsPage: React.FC<ArtifactsPageProps> = ({ timelineRef, onTabChange, events }) => {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
 
   // Group artifacts by type and deduplicate
   const artifactGroups = React.useMemo(() => {
-    const groups: { [key: string]: ArtifactGroup } = {};
+    const groups: Record<string, ArtifactGroup> = {};
 
     events.forEach(event => {
       event.artifacts?.forEach(artifact => {
@@ -48,32 +67,105 @@ const ArtifactsPage: React.FC<ArtifactsPageProps> = ({ timelineRef, onTabChange 
           };
         }
 
-        let existingItem = groups[artifact.type].items.find(
-          item => item.value === artifact.value
-        );
+        // Special handling for custom artifacts - group by event
+        if (artifact.type === 'custom') {
+          let existingItem = groups[artifact.type].items.find(
+            item => item.value === artifact.name  // Group by artifact name instead of event ID
+          );
 
-        if (!existingItem) {
-          existingItem = {
+          if (!existingItem) {
+            existingItem = {
+              value: artifact.name, // Use artifact name as the main grouping value
+              names: [],
+              events: [{
+                id: event.id,
+                title: event.title,
+                timestamp: event.timestamp
+              }],
+              customArtifacts: [] // Array to store artifacts with this name
+            };
+            groups[artifact.type].items.push(existingItem);
+          } else {
+            // Add event if not already present
+            if (!existingItem.events.some(e => e.id === event.id)) {
+              existingItem.events.push({
+                id: event.id,
+                title: event.title,
+                timestamp: event.timestamp
+              });
+            }
+          }
+
+          // Add the custom artifact to this group's collection
+          existingItem.customArtifacts = existingItem.customArtifacts || [];
+          existingItem.customArtifacts.push({
             value: artifact.value,
             linkedValue: artifact.linkedValue,
-            names: [artifact.name],
-            events: []
-          };
-          groups[artifact.type].items.push(existingItem);
-        } else {
-          // Add new name if it's not already in the list
-          if (!existingItem.names.includes(artifact.name)) {
-            existingItem.names.push(artifact.name);
-          }
-        }
-
-        // Add event reference if not already present
-        if (!existingItem.events.some(e => e.id === event.id)) {
-          existingItem.events.push({
-            id: event.id,
-            title: event.title,
-            timestamp: event.timestamp
+            eventTitle: event.title,
+            timestamp: event.timestamp,
+            eventId: event.id
           });
+        } else if (artifact.type === 'command') {
+          // Group by binary name (which is in artifactName)
+          let existingItem = groups[artifact.type].items.find(
+            item => item.value === artifact.name  // Group by binary name
+          );
+
+          if (!existingItem) {
+            existingItem = {
+              value: artifact.name,    // Binary name
+              names: [],              // Will store command names
+              commands: [artifact.value],  // Store the full command
+              events: [{
+                id: event.id,
+                title: event.title,
+                timestamp: event.timestamp
+              }]
+            };
+            groups[artifact.type].items.push(existingItem);
+          } else {
+            // Add the command if it's not already in the list
+            if (!existingItem.commands?.includes(artifact.value)) {
+              existingItem.commands = existingItem.commands || [];
+              existingItem.commands.push(artifact.value);
+            }
+            // Add event if not already present
+            if (!existingItem.events.some(e => e.id === event.id)) {
+              existingItem.events.push({
+                id: event.id,
+                title: event.title,
+                timestamp: event.timestamp
+              });
+            }
+          }
+        } else {
+          // Handle other artifact types as before
+          let existingItem = groups[artifact.type].items.find(
+            item => item.value === artifact.value
+          );
+
+          if (!existingItem) {
+            existingItem = {
+              value: artifact.value,
+              linkedValue: artifact.linkedValue,
+              names: [artifact.name],
+              events: []
+            };
+            groups[artifact.type].items.push(existingItem);
+          } else {
+            if (!existingItem.names.includes(artifact.name)) {
+              existingItem.names.push(artifact.name);
+            }
+          }
+
+          // Add event reference if not already present
+          if (!existingItem.events.some(e => e.id === event.id)) {
+            existingItem.events.push({
+              id: event.id,
+              title: event.title,
+              timestamp: event.timestamp
+            });
+          }
         }
       });
     });
@@ -82,11 +174,20 @@ const ArtifactsPage: React.FC<ArtifactsPageProps> = ({ timelineRef, onTabChange 
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       Object.keys(groups).forEach(type => {
-        groups[type].items = groups[type].items.filter(item => 
-          item.value.toLowerCase().includes(lowerQuery) ||
-          item.linkedValue?.toLowerCase().includes(lowerQuery) ||
-          item.names.some(name => name.toLowerCase().includes(lowerQuery))
-        );
+        groups[type].items = groups[type].items.filter(item => {
+          if (type === 'custom') {
+            return item.customArtifacts?.some(artifact =>
+              artifact.value.toLowerCase().includes(lowerQuery) ||
+              artifact.name.toLowerCase().includes(lowerQuery) ||
+              artifact.linkedValue?.toLowerCase().includes(lowerQuery)
+            );
+          }
+          return (
+            item.value.toLowerCase().includes(lowerQuery) ||
+            item.linkedValue?.toLowerCase().includes(lowerQuery) ||
+            item.names.some(name => name.toLowerCase().includes(lowerQuery))
+          );
+        });
       });
     }
 
@@ -120,6 +221,36 @@ const ArtifactsPage: React.FC<ArtifactsPageProps> = ({ timelineRef, onTabChange 
       }
     }, 200);
   };
+
+  const groupedArtifacts = events.reduce((acc: GroupedArtifacts, event) => {
+    event.artifacts?.forEach(artifact => {
+      switch (artifact.type) {
+        case 'hostname':
+          if (!acc.hostnames.some(a => a.value === artifact.value)) {
+            acc.hostnames.push(artifact);
+          }
+          break;
+        case 'command':
+          acc.commands.push(artifact);
+          break;
+        case 'custom':
+          if (!acc.custom.some(a => a.value === artifact.value)) {
+            acc.custom.push(artifact);
+          }
+          break;
+      }
+    });
+    return acc;
+  }, {
+    hostnames: [],
+    domains: [],
+    files: [],
+    ips: [],
+    hashes: [],
+    users: [],
+    commands: [],
+    custom: []
+  });
 
   return (
     <Card className="flex flex-col h-full">
@@ -159,42 +290,126 @@ const ArtifactsPage: React.FC<ArtifactsPageProps> = ({ timelineRef, onTabChange 
           </TabsList>
 
           {artifactGroups.map(group => (
-            <TabsContent key={group.type} value={group.type}>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="capitalize">{group.type} Artifacts</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[60vh]">
-                    <div className="space-y-4">
-                      {group.items.map((item, index) => (
+            group.type !== 'command' && (
+              <TabsContent key={group.type} value={group.type}>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="capitalize">{group.type} Artifacts</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ScrollArea className="h-[60vh]">
+                      <div className="space-y-4">
+                        {group.items.map((item, index) => (
+                          <div key={index} className="p-4 border rounded-lg">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                {group.type === 'custom' ? (
+                                  <>
+                                    <h3 className="font-medium">{item.value}</h3>
+                                    <div className="mt-2 space-y-2">
+                                      {item.customArtifacts?.map((artifact, i) => (
+                                        <div key={i} className="text-sm pl-4 border-l-2 border-muted">
+                                          <div>{artifact.value}</div>
+                                          {artifact.linkedValue && (
+                                            <div className="text-muted-foreground">
+                                              → {artifact.linkedValue}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <h3 className="font-medium flex items-center gap-2">
+                                      {item.value}
+                                      {item.linkedValue && (
+                                        <span className="text-sm text-muted-foreground">
+                                          ({item.linkedValue})
+                                        </span>
+                                      )}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      Observed as: 
+                                      {item.names.map((name, i) => (
+                                        <React.Fragment key={i}>
+                                          <br />• {name}
+                                        </React.Fragment>
+                                      ))}
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                              <span className="text-xs bg-primary/10 px-2 py-1 rounded">
+                                {item.events.length} {item.events.length === 1 ? 'event' : 'events'}
+                              </span>
+                            </div>
+
+                            <div className="mt-4 space-y-2">
+                              <h4 className="text-sm font-medium">Related Events:</h4>
+                              {item.events.map((event, eventIndex) => (
+                                <Button
+                                  key={eventIndex}
+                                  variant="ghost"
+                                  className="w-full justify-start text-left"
+                                  onClick={() => handleEventClick(event.id)}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <ExternalLink className="h-4 w-4" />
+                                    <div>
+                                      <div className="font-medium">{event.title}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {new Date(event.timestamp).toLocaleString()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )
+          ))}
+          <TabsContent value="command">
+            <Card>
+              <CardHeader>
+                <CardTitle className="capitalize">Command Artifacts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[60vh]">
+                  <div className="space-y-4">
+                    {artifactGroups
+                      .find(group => group.type === 'command')
+                      ?.items.map((item, index) => (
                         <div key={index} className="p-4 border rounded-lg">
                           <div className="flex items-start justify-between">
-                            <div>
-                              <h3 className="font-medium flex items-center gap-2">
-                                {item.value}
-                                {item.linkedValue && (
-                                  <span className="text-sm text-muted-foreground">
-                                    ({item.linkedValue})
-                                  </span>
-                                )}
-                              </h3>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                Observed as: {item.names.join(', ')}
-                              </p>
+                            <div className="flex-1">
+                              <h3 className="font-medium">{item.value}</h3>
+                              <div className="mt-2 space-y-1">
+                                {item.commands?.map((command, i) => (
+                                  <div key={i} className="text-sm text-muted-foreground pl-4 border-l-2 border-muted">
+                                    {command}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                             <span className="text-xs bg-primary/10 px-2 py-1 rounded">
                               {item.events.length} {item.events.length === 1 ? 'event' : 'events'}
                             </span>
                           </div>
 
-                          <div className="mt-4 space-y-2">
+                          <div className="mt-4">
                             <h4 className="text-sm font-medium">Related Events:</h4>
                             {item.events.map((event, eventIndex) => (
                               <Button
                                 key={eventIndex}
                                 variant="ghost"
-                                className="w-full justify-start text-left"
+                                className="w-full justify-start text-left mt-2"
                                 onClick={() => handleEventClick(event.id)}
                               >
                                 <div className="flex items-center gap-2">
@@ -211,12 +426,11 @@ const ArtifactsPage: React.FC<ArtifactsPageProps> = ({ timelineRef, onTabChange 
                           </div>
                         </div>
                       ))}
-                    </div>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </CardContent>
     </Card>

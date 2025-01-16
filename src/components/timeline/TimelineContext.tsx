@@ -1,17 +1,25 @@
 import { createContext, useContext } from 'react';
-import { useToast } from '../ui/use-toast';
+import type { TimelineEvent } from '@/pages/Index';
 
 interface TimelineContextType {
-  toast: ReturnType<typeof useToast>['toast'];
+  events: TimelineEvent[];
+  isEditMode: boolean;
+  onAddEvent: (parentId?: string) => string | null;
+  onUpdateEvent: (event: TimelineEvent) => void;
+  onDeleteEvent: (eventId: string) => void;
+  onLateralMovement: (sourceEvent: TimelineEvent, destinationHost: string) => void;
 }
 
 const TimelineContext = createContext<TimelineContextType | undefined>(undefined);
 
-export const TimelineProvider = ({ children }: { children: React.ReactNode }) => {
-  const { toast } = useToast();
-  
+interface TimelineProviderProps {
+  children: React.ReactNode;
+  value: TimelineContextType;
+}
+
+export const TimelineProvider = ({ children, value }: TimelineProviderProps) => {
   return (
-    <TimelineContext.Provider value={{ toast }}>
+    <TimelineContext.Provider value={value}>
       {children}
     </TimelineContext.Provider>
   );

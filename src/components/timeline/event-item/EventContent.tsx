@@ -10,7 +10,16 @@ interface EventContentProps {
 export const EventContent: React.FC<EventContentProps> = ({ event, parentEvent }) => {
   return (
     <div className="flex-1">
-      <div className="text-sm text-muted-foreground">{event.timestamp}</div>
+      <div className="text-sm text-muted-foreground">{new Date(event.timestamp).toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZoneName: 'short'
+      })}</div>
       <div className="font-medium">{event.title || "New Event"}</div>
       
       {event.artifacts?.length > 0 && (

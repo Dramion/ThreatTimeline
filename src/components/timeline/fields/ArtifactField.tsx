@@ -17,6 +17,8 @@ interface ArtifactFieldProps {
   recentArtifacts: {
     [key: string]: { value: string; linkedValue?: string }[];
   };
+  onBulkAdd?: (entries: string[]) => void;
+  onResetSuggestions: () => void;
 }
 
 export const ArtifactField: React.FC<ArtifactFieldProps> = (props) => {

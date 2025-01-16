@@ -5,12 +5,14 @@ import { TimelineProvider } from './timeline/TimelineContext';
 import { TimelineList } from './timeline/TimelineList';
 import { EventDialog } from './timeline/EventDialog';
 import type { TimelineEvent } from '@/pages/Index';
+import type { Incident } from '@/lib/incidents';
 import { ActionButtons } from './ActionButtons';
 import { Button } from './ui/button';
 import { Plus } from 'lucide-react';
 
 interface TimelineProps {
   events: TimelineEvent[];
+  incident?: Incident;
   onAddEvent: (parentId?: string) => string | null;
   onSelectEvent: (event: TimelineEvent) => void;
   onUpdateEvent: (event: TimelineEvent) => void;
@@ -18,7 +20,6 @@ interface TimelineProps {
   onLateralMovement: (sourceEvent: TimelineEvent, destinationHost: string) => void;
   isEditMode: boolean;
   onEditModeToggle: () => void;
-  onLoadDemo?: () => void;
 }
 
 export interface TimelineRef {
@@ -27,14 +28,14 @@ export interface TimelineRef {
 
 const Timeline = forwardRef<TimelineRef, TimelineProps>(({ 
   events, 
+  incident,
   onAddEvent, 
   onSelectEvent, 
   onUpdateEvent,
   onDeleteEvent,
   onLateralMovement,
   isEditMode,
-  onEditModeToggle,
-  onLoadDemo
+  onEditModeToggle
 }, ref) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
@@ -85,11 +86,18 @@ const Timeline = forwardRef<TimelineRef, TimelineProps>(({
   };
 
   return (
-    <TimelineProvider>
-      <Card className="flex flex-col h-full">
-        <div className="p-4 border-b flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <h2 className="text-2xl font-bold">Timeline</h2>
+    <TimelineProvider value={{ events, isEditMode, onAddEvent, onUpdateEvent, onDeleteEvent, onLateralMovement }}>
+      <Card className="relative">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h2 className="text-2xl font-bold">Timeline</h2>
+          <div className="flex items-center gap-2">
+            <ActionButtons
+              page="timeline"
+              events={events}
+              incident={incident}
+              onEditMode={onEditModeToggle}
+              isEditMode={isEditMode}
+            />
             {isEditMode && (
               <Button onClick={() => handleAddEvent()} size="sm">
                 <Plus className="w-4 h-4 mr-2" />
@@ -97,13 +105,6 @@ const Timeline = forwardRef<TimelineRef, TimelineProps>(({
               </Button>
             )}
           </div>
-          <ActionButtons
-            page="timeline"
-            onLoadDemo={onLoadDemo}
-            onEditMode={onEditModeToggle}
-            isEditMode={isEditMode}
-            events={events}
-          />
         </div>
         <div className="flex-1 overflow-auto">
           <TimelineList

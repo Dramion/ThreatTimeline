@@ -6,13 +6,15 @@ interface ArtifactValueInputProps {
   value: string;
   onChange: (value: string) => void;
   recentValues: string[];
+  placeholder?: string;
 }
 
 export const ArtifactValueInput: React.FC<ArtifactValueInputProps> = ({
   type,
   value,
   onChange,
-  recentValues = []
+  recentValues = [],
+  placeholder = "Enter value..."
 }) => {
   const inputId = `artifact-value-${type}`;
   const datalistId = `recent-values-${type}`;
@@ -22,7 +24,7 @@ export const ArtifactValueInput: React.FC<ArtifactValueInputProps> = ({
       <Input
         id={inputId}
         list={datalistId}
-        placeholder="Enter value..."
+        placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full"

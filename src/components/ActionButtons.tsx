@@ -1,13 +1,14 @@
 import { Button } from "@/components/ui/button";
-import { Eye, Edit2, Database, RotateCcw, Download } from "lucide-react";
+import { Eye, Edit2, RotateCcw, Download } from "lucide-react";
 import { ReportButton } from "@/components/ReportButton";
 import type { TimelineEvent } from "@/pages/Index";
+import type { Incident } from "@/lib/incidents";
 
 interface ActionButtonsProps {
   page: 'timeline' | 'visualization' | 'artifacts';
   events: TimelineEvent[];
+  incident?: Incident;
   // Timeline specific props
-  onLoadDemo?: () => void;
   onEditMode?: () => void;
   isEditMode?: boolean;
   // Visualization specific props
@@ -18,7 +19,7 @@ interface ActionButtonsProps {
 export function ActionButtons({
   page,
   events,
-  onLoadDemo,
+  incident,
   onEditMode,
   onResetLayout,
   onExportPng,
@@ -28,10 +29,6 @@ export function ActionButtons({
     <div className="flex gap-2">
       {page === 'timeline' && (
         <>
-          <Button variant="outline" onClick={onLoadDemo}>
-            <Database className="mr-2 h-4 w-4" />
-            Load Demo Data
-          </Button>
           <Button
             variant={isEditMode ? "default" : "outline"}
             onClick={onEditMode}
@@ -43,7 +40,7 @@ export function ActionButtons({
             )}
             {isEditMode ? "View Mode" : "Edit Mode"}
           </Button>
-          <ReportButton events={events} />
+          <ReportButton incident={incident} events={events} />
         </>
       )}
 
