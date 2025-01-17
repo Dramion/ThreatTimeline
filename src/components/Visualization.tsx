@@ -28,7 +28,7 @@ import type { TimelineEvent } from '@/pages/Index';
 import { calculateLayout } from './visualization/layoutUtils';
 import { cn } from '@/lib/utils';
 import { ActionButtons } from './ActionButtons';
-import { toPng } from 'html-to-image';
+import { toPng, toSvg } from 'html-to-image';
 
 interface VisualizationProps {
   events: TimelineEvent[];
@@ -145,6 +145,22 @@ const Flow: React.FC<VisualizationProps> = ({
     }
   };
 
+  const handleExportSvg = async () => {
+    if (reactFlowWrapper.current === null) {
+      return;
+    }
+    
+    const nodesBounds = getNodesBounds(nodes);
+    const transform = getViewportForBounds(nodesBounds, 1280, 720, 0.5, 2);
+    
+    const dataUrl = await toSvg<HTMLElement>(document.querySelector('.react-flow__viewport'), {});
+
+    const link = document.createElement('a');
+    link.download = 'threat-timeline.svg';
+    link.href = dataUrl;
+    link.click();
+  };
+
   const handleExportPng = async () => {
     if (reactFlowWrapper.current === null) {
       return;
@@ -236,6 +252,7 @@ const Flow: React.FC<VisualizationProps> = ({
           <ActionButtons
             page="visualization"
             onResetLayout={onResetRequest}
+            onExportSvg={handleExportSvg}
             onExportPng={handleExportPng}
             events={events}
           />
