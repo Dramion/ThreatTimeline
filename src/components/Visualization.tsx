@@ -149,18 +149,18 @@ const Flow: React.FC<VisualizationProps> = ({
     if (reactFlowWrapper.current === null) {
       return;
     }
-
-    const nodesBounds = getRectOfNodes(nodes);
-    const transform = getTransformForBounds(nodesBounds, 1000, 800, 0.5, 2);
     
-    const dataUrl = await toPng(reactFlowWrapper.current, {
-      backgroundColor: '#ffffff',
-      width: 1000,
-      height: 1000,
+    const nodesBounds = getNodesBounds(nodes);
+    const transform = getViewportForBounds(nodesBounds, 1280, 720, 0.5, 2);
+    
+    const dataUrl = await toPng<HTMLElement>(document.querySelector('.react-flow__viewport'), {
+      backgroundColor: '#aaaaaa',
+      width: 1280,
+      height: 720,
       style: {
-        width: '1000px',
-        height: '800px',
-        transform: `translate(${transform[0]}px, ${transform[1]}px) scale(${transform[2]})`,
+        width: '1280px',
+        height: '720px',
+        transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`,
       },
     });
 
