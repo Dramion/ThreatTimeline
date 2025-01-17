@@ -21,14 +21,14 @@ import ReactFlow, {
   getTransformForBounds,
   useReactFlow,
   getNodesBounds,
-  getViewportForBounds
+  getViewportForBounds,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import type { TimelineEvent } from '@/pages/Index';
 import { calculateLayout } from './visualization/layoutUtils';
 import { cn } from '@/lib/utils';
 import { ActionButtons } from './ActionButtons';
-import { toPng } from 'html-to-image';
+import { toPng, toSvg } from 'html-to-image';
 
 interface VisualizationProps {
   events: TimelineEvent[];
@@ -151,7 +151,7 @@ const Flow: React.FC<VisualizationProps> = ({
     }
   };
 
-  const handleExportPng = async () => {
+  const handleExportSvg = async () => {
     if (reactFlowWrapper.current === null) {
       return;
     }
@@ -159,14 +159,30 @@ const Flow: React.FC<VisualizationProps> = ({
     const nodesBounds = getNodesBounds(nodes);
     const transform = getViewportForBounds(nodesBounds, 1280, 720, 0.5, 2);
     
-    const dataUrl = await toPng(reactFlowWrapper.current, {
-      backgroundColor: '#ffffff',
-      width: 1000,
-      height: 800,
+    const dataUrl = await toSvg<HTMLElement>(document.querySelector('.react-flow__viewport'), {});
+
+    const link = document.createElement('a');
+    link.download = 'threat-timeline.svg';
+    link.href = dataUrl;
+    link.click();
+  };
+
+  const handleExportPng = async () => {
+    if (reactFlowWrapper.current === null) {
+      return;
+    }
+
+    const nodesBounds = getNodesBounds(nodes);
+    const transform = getViewportForBounds(nodesBounds, 1280, 720, 0.5, 2);
+    
+    const dataUrl = await toPng<HTMLElement>(document.querySelector('.react-flow__viewport'), {
+      backgroundColor: '#aaaaaa',
+      width: 1280,
+      height: 720,
       style: {
-        width: '1000px',
-        height: '800px',
-        transform: `translate(${transform[0]}px, ${transform[1]}px) scale(${transform[2]})`,
+        width: '1280px',
+        height: '720px',
+        transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`,
       },
     });
 
@@ -242,6 +258,7 @@ const Flow: React.FC<VisualizationProps> = ({
           <ActionButtons
             page="visualization"
             onResetLayout={onResetRequest}
+            onExportSvg={handleExportSvg}
             onExportPng={handleExportPng}
             events={events}
           />
